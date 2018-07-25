@@ -10,7 +10,8 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 
 
-#### FUNCTIONS 1.0
+#### FUNCTIONS 1.2
+import requests
 
 def validateFilename(filename):
     filenameregex = '^[a-zA-Z0-9]+_[a-zA-Z0-9]+_[a-zA-Z0-9]+_[0-9][0-9][0-9][0-9]_[0-9QY][0-9]$'
@@ -38,19 +39,19 @@ def validateFilename(filename):
 
 def validateURL(url):
     try:
-        r = urllib2.urlopen(url)
+        r = requests.get(url)
         count = 1
-        while r.getcode() == 500 and count < 4:
+        while r.status_code == 500 and count < 4:
             print ("Attempt {0} - Status code: {1}. Retrying.".format(count, r.status_code))
             count += 1
-            r = urllib2.urlopen(url)
+            r = requests.get(url)
         sourceFilename = r.headers.get('Content-Disposition')
 
         if sourceFilename:
             ext = os.path.splitext(sourceFilename)[1].replace('"', '').replace(';', '').replace(' ', '')
         else:
             ext = os.path.splitext(url)[1]
-        validURL = r.getcode() == 200
+        validURL = r.status_code == 200
         validFiletype = ext.lower() in ['.csv', '.xls', '.xlsx']
         return validURL, validFiletype
     except:
@@ -85,8 +86,8 @@ def convert_mth_strings ( mth_string ):
 
 #### VARIABLES 1.0
 
-entity_id = "E3632_EAEBC_gov"
-url = "https://www.epsom-ewell.gov.uk/council/about-council/financial-reports/payment-suppliers"
+entity_id = "E3034_GBC_gov"
+url = "https://www.gedling.gov.uk/council/aboutus/financeandaccounts/opendata/finance/"
 errors = 0
 data = []
 
@@ -98,20 +99,28 @@ soup = BeautifulSoup(html, 'lxml')
 
 #### SCRAPE DATA
 
-
-links = soup.find('table', attrs = {'class': 'sticky-enabled'}).find_all('a')
+links = soup.find('label', attrs={'for':'group-1'}).find_next('div').find_all('a')
 for link in links:
-    if 'http' not in link['href']:
-        url = 'https://www.epsom-ewell.gov.uk'+link['href']
-    else:
-        url = link['href']
-    file_name = link.text
-    if '.csv' in url:
-        csvMth = file_name[:3]
+    if '/opendata/' in link['href']:
+        file_name = link.text.strip()
+        if 'http' not in link['href']:
+            url = 'https://www.gedling.gov.uk' + link['href']
+        else:
+            url = link['href']
+        csvMth = ''
+        if '/04/' in file_name and '/06/' in file_name:
+            csvMth = 'Q2'
+        if '/01/' in file_name and '/03/' in file_name:
+            csvMth = 'Q1'
+        if '/10/' in file_name and '/12/' in file_name:
+            csvMth = 'Q4'
+        if '/07/' in file_name and '/09/' in file_name:
+            csvMth = 'Q3'
+        else:
+            csvMth = 'Q0'
         csvYr = file_name[-4:]
         csvMth = convert_mth_strings(csvMth.upper())
         data.append([csvYr, csvMth, url])
-
 
 #### STORE DATA 1.0
 
